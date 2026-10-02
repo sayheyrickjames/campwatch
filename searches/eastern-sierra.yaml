@@ -1,0 +1,16 @@
+# PLACEHOLDER DATES — edit start_date / end_date for your real trip.
+# Any camply YAML option works:
+# https://juftin.com/camply/command_line_usage/#searching-for-a-campsite-by-yaml-config
+
+provider: RecreationDotGov
+campgrounds:
+  - 232269    # Oh Ridge
+  - 232268    # June Lake
+  - 234311    # Convict Lake Campground
+  - 234329    # Twin Lakes Campground
+  - 10039845  # Gull Lake Campground
+  - 232395    # French Camp
+start_date: 2027-06-01
+end_date: 2027-08-31
+nights: 3             # at least 3 consecutive nights at one site
+# days: [Friday, Saturday]   # only these nights of the week

@@ -1,0 +1,57 @@
+name: Watch campsites
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # GitHub may delay scheduled runs by a few minutes
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["searches/**", "site/**", "watch.py", "requirements.txt"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Search and alert
+        env:
+          APPRISE_URL: ${{ secrets.APPRISE_URL }}
+        run: python watch.py
+
+      - name: Remember what was alerted
+        run: |
+          if ! git diff --quiet state/; then
+            git config user.name "campwatch-bot"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add state/
+            git commit -m "Update seen campsites [skip ci]"
+            git push
+          fi
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

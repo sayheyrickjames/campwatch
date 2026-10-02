@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campwatch</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛺</text></svg>">
+<style>
+  :root {
+    --bg: #f6f4ef; --card: #fffdf8; --ink: #22261f; --muted: #6b7064;
+    --line: #e3dfd4; --accent: #2f6b45; --accent-soft: #e2efe5; --warn: #a3471b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151813; --card: #1e221b; --ink: #e8eae3; --muted: #9aa092;
+      --line: #2f342b; --accent: #7fc495; --accent-soft: #23362a; --warn: #f0a07a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 40px 16px 64px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 28px; margin: 0; letter-spacing: -0.02em; }
+  .checked { color: var(--muted); font-size: 14px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
+  .dot.stale { background: var(--warn); }
+  .lede { color: var(--muted); margin: 6px 0 28px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; }
+  h2 { font-size: 18px; margin: 0; display: flex; justify-content: space-between; gap: 12px; }
+  .count { font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: var(--line); color: var(--muted); white-space: nowrap; }
+  .count.open { background: var(--accent-soft); color: var(--accent); }
+  .file { color: var(--muted); font-size: 13px; font-family: ui-monospace, Menlo, monospace; }
+  ul { list-style: none; padding: 0; margin: 12px 0 0; }
+  li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 15px; }
+  li span { color: var(--muted); }
+  a { color: var(--accent); font-weight: 600; text-decoration: none; white-space: nowrap; }
+  a:hover { text-decoration: underline; }
+  .error { color: var(--warn); font-size: 14px; margin-top: 10px; }
+  .empty { color: var(--muted); font-size: 14px; margin-top: 8px; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 32px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>⛺ Campwatch</h1>
+    <div class="checked" id="checked">Loading…</div>
+  </header>
+  <p class="lede">Watching sold-out campgrounds for cancellations. Checks run about every 10 minutes; new openings are pushed to my phone.</p>
+  <div id="searches"></div>
+  <footer>Powered by <a href="https://github.com/juftin/camply">camply</a>, GitHub Actions and <a href="https://ntfy.sh">ntfy</a>. Availability changes fast — always confirm on the booking site.</footer>
+</main>
+<script>
+  const el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    Object.entries(attrs).forEach(([k, v]) => (k === "class" ? (n.className = v) : n.setAttribute(k, v)));
+    kids.flat().forEach((k) => n.append(k));
+    return n;
+  };
+  const ago = (iso) => {
+    const m = Math.round((Date.now() - new Date(iso)) / 60000);
+    return m < 1 ? "just now" : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`;
+  };
+  const fmtDate = (d) =>
+    new Date(d + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+
+  fetch("status.json", { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : Promise.reject()))
+    .then((data) => {
+      const stale = Date.now() - new Date(data.checked_at) > 45 * 60000;
+      const checked = document.getElementById("checked");
+      checked.replaceChildren(el("span", { class: "dot" + (stale ? " stale" : "") }), `Last checked ${ago(data.checked_at)}`);
+      checked.title = new Date(data.checked_at).toLocaleString();
+
+      const root = document.getElementById("searches");
+      data.searches.forEach((s) => {
+        const n = s.available.length;
+        const sec = el("section", {},
+          el("h2", {}, s.name, el("span", { class: "count" + (n ? " open" : "") }, n ? `${n} open` : "Nothing open")),
+          el("div", { class: "file" }, s.file));
+        if (s.error) sec.append(el("div", { class: "error" }, "Last check failed: " + s.error));
+        if (n) {
+          sec.append(el("ul", {}, s.available.slice(0, 25).map((a) =>
+            el("li", {},
+              el("div", {}, `${fmtDate(a.date)} · ${a.nights} night${a.nights > 1 ? "s" : ""} `,
+                el("span", {}, `· ${a.campground} · site ${a.site}`)),
+              el("a", { href: a.url, target: "_blank", rel: "noopener" }, "Book →")))));
+          if (n > 25) sec.append(el("div", { class: "empty" }, `…and ${n - 25} more`));
+        } else if (!s.error) {
+          sec.append(el("div", { class: "empty" }, "No matching availability right now."));
+        }
+        root.append(sec);
+      });
+    })
+    .catch(() => (document.getElementById("checked").textContent = "No results yet — the first check hasn't run."));
+</script>
+</body>
+</html>

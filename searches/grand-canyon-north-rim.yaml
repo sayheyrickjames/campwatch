@@ -1,0 +1,11 @@
+# PLACEHOLDER DATES — edit start_date / end_date for your real trip.
+# Any camply YAML option works:
+# https://juftin.com/camply/command_line_usage/#searching-for-a-campsite-by-yaml-config
+
+provider: RecreationDotGov
+campgrounds:
+  - 232489    # North Rim Campground
+start_date: 2027-06-01
+end_date: 2027-08-31
+nights: 3             # at least 3 consecutive nights at one site
+# days: [Friday, Saturday]   # only these nights of the week
